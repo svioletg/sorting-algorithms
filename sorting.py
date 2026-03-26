@@ -28,18 +28,28 @@ def sort_bubble[T: SupportsGreaterThan](to_sort: list[T]) -> list[T]:
     return to_sort
 
 def main() -> int:
+    sorting_funcs_available: dict[str, Callable[[list[SupportsGreaterThan]], list]] = \
+        {name.removeprefix('sort_'):obj for name, obj in globals().items() if name.startswith('sort_')}
+
     parser = ArgumentParser(description='Sorts the lines of a given file (or stdin), sending the sorted'
         + ' content to stdout and performance report to stderr.')
-    parser.add_argument('algorithm', type=str,
-        choices=tuple(name.removeprefix('sort_') for name in globals() if name.startswith('sort_')),
-        help='Which sorting algorithm to use.')
+    parser.add_argument('algorithm', type=lambda s: s.split(','),
+        help='Which sorting algorithm(s) to use. "ALL" runs every available algorithm and prints their results'
+        + ' as each one finishes. If multiple algorithms are given, the sorted content is only printed for the'
+        + ' first algorithm. Invalid choices are ignored. Available choices are:'
+        + f' {', '.join(sorting_funcs_available.keys())}')
     parser.add_argument('to_sort', type=str,
         help='Path to a file to sort the lines of. Use a single hyphen to read from stdin.')
     parser.add_argument('--loops', '-n', type=int, default=1,
         help='How many times to perform the sort.')
+    parser.add_argument('--quiet', '-q', action='store_true',
+        help='Only outputs the performance results.')
 
     args = parser.parse_args()
-    sort_func: Callable[[list[SupportsGreaterThan]], list] = globals()['sort_' + args.algorithm]
+    sorting_funcs: tuple[Callable[[list[SupportsGreaterThan]], list], ...] = \
+        tuple(sorting_funcs_available.values()) if args.algorithm == ['ALL'] else tuple(
+        func for name, func in sorting_funcs_available.items() if name.removeprefix('sort_') in args.algorithm
+    )
     content_stream = sys.stdin if args.to_sort == '-' else open(args.to_sort, encoding='utf-8')
 
     content: list[str] = [i.strip() for i in content_stream.readlines()]
@@ -51,22 +61,30 @@ def main() -> int:
         print('Value to argument --loops/-n cannot be less than 1', file=sys.stderr)
         return 1
 
+    quiet: bool = args.quiet
+
     # End argument parsing
 
-    runs: list[int] = []
+    result_printed: bool = False
 
-    for _ in range(run_count):
-        ta: int = perf_counter_ns()
-        sorted_content = sort_func(content.copy())
-        tb: int = perf_counter_ns()
-        runs.append(tb - ta)
+    for sort_func in sorting_funcs:
+        runs: list[int] = []
 
-    runs_avg: int = sum(runs) // len(runs)
+        for _ in range(run_count):
+            ta: int = perf_counter_ns()
+            sorted_content = sort_func(content.copy())
+            tb: int = perf_counter_ns()
+            runs.append(tb - ta)
 
-    perf_report: str = f'Sorted {len(content)} lines {runs_avg / 1e9:.8f}s ({runs_avg}ns) averaged from {run_count} loop(s)'
+        runs_avg: int = sum(runs) // len(runs)
 
-    print('\n'.join(sorted_content))
-    print(perf_report, file=sys.stderr)
+        perf_report: str = f'{sort_func.__name__}: Sorted {len(content)} lines {runs_avg / 1e9:.8f}s ({runs_avg}ns)' \
+            + f' averaged from {run_count} loop(s)'
+
+        if (not quiet) and (not result_printed):
+            print('\n'.join(sorted_content))
+            result_printed = True
+        print(perf_report, file=sys.stderr)
 
     return 0
 
