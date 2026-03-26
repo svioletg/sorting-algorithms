@@ -40,12 +40,13 @@ def main() -> int:
 
     args = parser.parse_args()
     sort_func: Callable[[list[SupportsGreaterThan]], list] = globals()['sort_' + args.algorithm]
-    content: list[str] = [
-        i.strip()
-        for i in (sys.stdin if args.to_sort == '-' else open(args.to_sort, encoding='utf-8')).readlines()
-    ]
-    run_count: int = args.loops
+    content_stream = sys.stdin if args.to_sort == '-' else open(args.to_sort, encoding='utf-8')
 
+    content: list[str] = [i.strip() for i in content_stream.readlines()]
+    if content_stream is not sys.stdin:
+        content_stream.close()
+
+    run_count: int = args.loops
     if run_count < 1:
         print('Value to argument --loops/-n cannot be less than 1', file=sys.stderr)
         return 1
@@ -62,7 +63,7 @@ def main() -> int:
 
     runs_avg: int = sum(runs) // len(runs)
 
-    perf_report: str = f'{runs_avg / 1e9:.8f}s ({runs_avg}ns) averaged from {run_count} loop(s)'
+    perf_report: str = f'Sorted {len(content)} lines {runs_avg / 1e9:.8f}s ({runs_avg}ns) averaged from {run_count} loop(s)'
 
     print('\n'.join(sorted_content))
     print(perf_report, file=sys.stderr)
