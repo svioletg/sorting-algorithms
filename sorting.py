@@ -1,12 +1,14 @@
 import sys
-from argparse import ArgumentParser, FileType
+from argparse import ArgumentParser
 from collections.abc import Callable
-from pathlib import Path
-from time import perf_counter_ns, sleep
+from time import perf_counter_ns
 from typing import Protocol
 
+
 class SupportsGreaterThan(Protocol):
-    def __gt__(self, other: object) -> bool: ...
+    def __gt__(self, value, /) -> bool: ...
+
+type SortFunc = Callable[[list[SupportsGreaterThan]], list[SupportsGreaterThan]]
 
 def sort_bubble[T: SupportsGreaterThan](to_sort: list[T]) -> list[T]:
     """Sorts a list in-place with bubble sort, then returns a reference to the same list."""
@@ -46,7 +48,7 @@ def main() -> int:
         help='Only outputs the performance results.')
 
     args = parser.parse_args()
-    sorting_funcs: tuple[Callable[[list[SupportsGreaterThan]], list], ...] = \
+    sorting_funcs: tuple[SortFunc, ...] = \
         tuple(sorting_funcs_available.values()) if args.algorithm == ['ALL'] else tuple(
         func for name, func in sorting_funcs_available.items() if name.removeprefix('sort_') in args.algorithm
     )
@@ -72,14 +74,15 @@ def main() -> int:
 
         for _ in range(run_count):
             ta: int = perf_counter_ns()
-            sorted_content = sort_func(content.copy())
+            # Not really sure why ty raises an issue about this sort_func call but it works fine
+            sorted_content: list[str] = sort_func(content.copy())  # ty:ignore[invalid-argument-type]
             tb: int = perf_counter_ns()
             runs.append(tb - ta)
 
         runs_avg: int = sum(runs) // len(runs)
 
         perf_report: str = f'{sort_func.__name__}: Sorted {len(content)} lines {runs_avg / 1e9:.8f}s ({runs_avg}ns)' \
-            + f' averaged from {run_count} loop(s)'
+            + f' averaged from {run_count} loop(s)'  # ty:ignore[unresolved-attribute]
 
         if (not quiet) and (not result_printed):
             print('\n'.join(sorted_content))
