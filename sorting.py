@@ -155,7 +155,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         perf_report: str = ''
         match report_format:
-            case 'statemenet':
+            case 'statement':
                 perf_report = f'{sort_func.__name__}: Sorted {len(content)} lines {runs_avg / 1e9:.8f}s ({runs_avg}ns)' \
                     + f' averaged from {run_count} loop(s)'  # ty:ignore[unresolved-attribute]
                 if isinstance(unsorted, TrackedList):
